@@ -41,10 +41,11 @@ func Write(config Config) error {
 	return os.WriteFile(getConfigFilePath(), configJSON, 0644)
 }
 
-func (config *Config) SetUser(username string) {
+func (config *Config) SetUser(username string) error {
 	config.CurrentUserName = username
 	err := Write(*config)
 	if err != nil {
-		panic(err)
+		return err
 	}
+	return nil
 }
