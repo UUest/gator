@@ -1,13 +1,21 @@
 package commands
 
 import (
+	"context"
+	"database/sql"
 	"fmt"
+	"os"
+	"time"
+
+	"github.com/google/uuid"
 
 	"github.com/UUest/gator/internal/config"
+	"github.com/UUest/gator/internal/database"
 )
 
 type State struct {
 	Config *config.Config
+	DB     *database.Queries
 }
 
 type Command struct {
@@ -23,11 +31,50 @@ func HandlerLogin(s *State, cmd Command) error {
 	if cmd.Args == nil {
 		return fmt.Errorf("Expected a username")
 	}
-	err := s.Config.SetUser(cmd.Args[0])
+	_, err := s.DB.GetUser(context.Background(), cmd.Args[0])
+	if err == sql.ErrNoRows {
+		fmt.Println("User does not exist, please register first")
+		os.Exit(1)
+	}
+	if err != nil {
+		return err
+	}
+	err = s.Config.SetUser(cmd.Args[0])
 	if err != nil {
 		return err
 	}
 	fmt.Printf("Username set to %s\n", cmd.Args[0])
+	return nil
+}
+
+func HandlerRegister(s *State, cmd Command) error {
+	if cmd.Args == nil {
+		return fmt.Errorf("Expected a username")
+	}
+	existingUser, err := s.DB.GetUser(context.Background(), cmd.Args[0])
+	if err != nil && err != sql.ErrNoRows {
+		return err
+	}
+	if err != nil && existingUser.Name == cmd.Args[0] {
+		fmt.Println("User already exists")
+		os.Exit(1)
+	}
+	userParams := database.CreateUserParams{
+		ID:        uuid.New(),
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+		Name:      cmd.Args[0],
+	}
+	dbUser, err := s.DB.CreateUser(context.Background(), userParams)
+	if err != nil {
+		return err
+	}
+	HandlerLogin(s, cmd)
+	fmt.Printf("User %s registered\n", dbUser.Name)
+	fmt.Printf("ID: %s\n", dbUser.ID)
+	fmt.Printf("Created at: %s\n", dbUser.CreatedAt)
+	fmt.Printf("Updated at: %s\n", dbUser.UpdatedAt)
+	fmt.Printf("Name: %s\n", dbUser.Name)
 	return nil
 }
 
