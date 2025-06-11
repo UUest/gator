@@ -40,6 +40,7 @@ func main() {
 	c.Register("users", commands.HandlerGetUsers)
 	c.Register("agg", commands.HandlerAgg)
 	c.Register("addfeed", commands.HandlerAddFeed)
+	c.Register("feeds", commands.HandlerGetFeeds)
 
 	input := os.Args
 	switch input[1] {
@@ -71,6 +72,11 @@ func main() {
 	case "addfeed":
 		if len(input) < 4 {
 			fmt.Println("Usage: gator addfeed <feed_name> <feed_url>")
+			os.Exit(1)
+		}
+	case "feeds":
+		if len(input) < 2 {
+			fmt.Println("Usage: gator feeds")
 			os.Exit(1)
 		}
 	default:
