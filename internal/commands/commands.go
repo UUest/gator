@@ -69,12 +69,35 @@ func HandlerRegister(s *State, cmd Command) error {
 	if err != nil {
 		return err
 	}
-	HandlerLogin(s, cmd)
 	fmt.Printf("User %s registered\n", dbUser.Name)
 	fmt.Printf("ID: %s\n", dbUser.ID)
 	fmt.Printf("Created at: %s\n", dbUser.CreatedAt)
 	fmt.Printf("Updated at: %s\n", dbUser.UpdatedAt)
 	fmt.Printf("Name: %s\n", dbUser.Name)
+	HandlerLogin(s, cmd)
+	return nil
+}
+
+func HandlerReset(s *State, cmd Command) error {
+	if err := s.DB.Reset(context.Background()); err != nil {
+		return err
+	}
+	fmt.Println("Database reset")
+	return nil
+}
+
+func HandlerGetUsers(s *State, cmd Command) error {
+	users, err := s.DB.GetUsers(context.Background())
+	if err != nil {
+		return err
+	}
+	for _, user := range users {
+		if user.Name == s.Config.CurrentUserName {
+			fmt.Printf("* %s (current)\n", user.Name)
+		} else {
+			fmt.Printf("* %s\n", user.Name)
+		}
+	}
 	return nil
 }
 

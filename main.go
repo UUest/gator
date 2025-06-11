@@ -36,10 +36,33 @@ func main() {
 	}
 	c.Register("login", commands.HandlerLogin)
 	c.Register("register", commands.HandlerRegister)
+	c.Register("reset", commands.HandlerReset)
+	c.Register("users", commands.HandlerGetUsers)
 
 	input := os.Args
-	if len(input) < 3 {
-		fmt.Println("Usage: gator <command> <args>")
+	switch input[1] {
+	case "login":
+		if len(input) < 3 {
+			fmt.Println("Usage: gator login <username>")
+			os.Exit(1)
+		}
+	case "register":
+		if len(input) < 3 {
+			fmt.Println("Usage: gator register <username>")
+			os.Exit(1)
+		}
+	case "reset":
+		if len(input) < 2 {
+			fmt.Println("Usage: gator reset")
+			os.Exit(1)
+		}
+	case "users":
+		if len(input) < 2 {
+			fmt.Println("Usage: gator users")
+			os.Exit(1)
+		}
+	default:
+		fmt.Println("Unknown command:", input[1])
 		os.Exit(1)
 	}
 
