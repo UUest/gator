@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -175,22 +176,16 @@ func FetchFeed(ctx context.Context, feedURL string) (*RSSFeed, error) {
 	return &feed, nil
 }
 
-func HandlerAgg(s *State, cmd Command) error {
-	feedURL := "https://www.wagslane.dev/index.xml"
-	feed, err := FetchFeed(context.Background(), feedURL)
+func HandlerAgg(s *State, cmd Command, user database.User) error {
+	fmt.Printf("Collecting feeds every %s\n", cmd.Args[0])
+	reqTime, err := time.ParseDuration(cmd.Args[0])
 	if err != nil {
 		return err
 	}
-	if feed == nil {
-		return fmt.Errorf("feed is nil")
+	ticker := time.NewTicker(reqTime)
+	for ; ; <-ticker.C {
+		ScrapeFeeds(s, cmd, user)
 	}
-	fmt.Printf("Feed Title: %s\n", feed.Channel.Title)
-	fmt.Printf("Feed Description: %s\n", feed.Channel.Description)
-	for _, item := range feed.Channel.Items {
-		fmt.Printf("Item Title: %s\n", item.Title)
-		fmt.Printf("Item Description: %s\n", item.Description)
-	}
-	return nil
 }
 
 func HandlerAddFeed(s *State, cmd Command, user database.User) error {
@@ -303,5 +298,71 @@ func HandlerUnfollow(s *State, cmd Command, user database.User) error {
 		return err
 	}
 	fmt.Printf("Feed: %s now unfollowed by %s\n", feed.Name, user.Name)
+	return nil
+}
+
+func ScrapeFeeds(s *State, cmd Command, user database.User) error {
+	nextFeed, err := s.DB.GetNextFeedToFetch(context.Background(), user.ID)
+	if err != nil {
+		return err
+	}
+	_, err = s.DB.MarkFeedFetched(context.Background(), nextFeed.ID)
+	if err != nil {
+		return err
+	}
+	feed, err := FetchFeed(context.Background(), nextFeed.Url)
+	if err != nil {
+		return err
+	}
+	for _, item := range feed.Channel.Items {
+		pubAt, err := time.Parse(time.RFC1123, item.PubDate)
+		if err != nil {
+			return err
+		}
+		postParams := database.CreatePostParams{
+			Title:       item.Title,
+			Url:         item.Link,
+			PublishedAt: pubAt,
+			Description: item.Description,
+			FeedID:      nextFeed.ID,
+		}
+		err = s.DB.CreatePost(context.Background(), postParams)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func HandlerGetPosts(s *State, cmd Command, user database.User) error {
+	var limit int64
+
+	if len(cmd.Args) != 1 {
+		limit = 2
+	} else {
+		var err error
+		limit, err = strconv.ParseInt(cmd.Args[0], 10, 32)
+		if err != nil {
+			return err
+		}
+	}
+	postParams := database.GetPostsForUserParams{
+		UserID: user.ID,
+		Limit:  int32(limit),
+	}
+	posts, err := s.DB.GetPostsForUser(context.Background(), postParams)
+	if err != nil {
+		return err
+	}
+	if len(posts) == 0 {
+		fmt.Println("No posts found")
+		return nil
+	}
+	fmt.Println("Posts:")
+	for _, post := range posts {
+		fmt.Printf("Title: %s\n", post.Title)
+		fmt.Printf("Link: %s\n", post.Url)
+		fmt.Printf("Published At: %s\n", post.PublishedAt.Format(time.RFC1123))
+	}
 	return nil
 }

@@ -38,12 +38,13 @@ func main() {
 	c.Register("register", commands.HandlerRegister)
 	c.Register("reset", commands.HandlerReset)
 	c.Register("users", commands.HandlerGetUsers)
-	c.Register("agg", commands.HandlerAgg)
+	c.Register("agg", commands.MiddlewareLoggedIn(commands.HandlerAgg))
 	c.Register("addfeed", commands.MiddlewareLoggedIn(commands.HandlerAddFeed))
 	c.Register("feeds", commands.HandlerGetFeeds)
 	c.Register("follow", commands.MiddlewareLoggedIn(commands.HandlerFollow))
 	c.Register("following", commands.MiddlewareLoggedIn(commands.HandlerFollowing))
 	c.Register("unfollow", commands.MiddlewareLoggedIn(commands.HandlerUnfollow))
+	c.Register("browse", commands.MiddlewareLoggedIn(commands.HandlerGetPosts))
 
 	input := os.Args
 	switch input[1] {
@@ -68,8 +69,8 @@ func main() {
 			os.Exit(1)
 		}
 	case "agg":
-		if len(input) < 2 {
-			fmt.Println("Usage: gator agg")
+		if len(input) < 3 {
+			fmt.Println("Usage: gator agg <interval>")
 			os.Exit(1)
 		}
 	case "addfeed":
@@ -95,6 +96,11 @@ func main() {
 	case "unfollow":
 		if len(input) < 3 {
 			fmt.Println("Usage: gator unfollow <feed_url>")
+			os.Exit(1)
+		}
+	case "browse":
+		if len(input) < 2 {
+			fmt.Println("Usage: gator browse")
 			os.Exit(1)
 		}
 	default:

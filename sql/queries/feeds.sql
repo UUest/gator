@@ -54,3 +54,18 @@ WHERE ff.user_id = $1;
 DELETE FROM feed_follows
 WHERE feed_id = $1 AND user_id = $2
 RETURNING *;
+
+-- name: MarkFeedFetched :one
+UPDATE feeds
+SET last_fetched = NOW(),
+    updated_at = NOW()
+WHERE id = $1
+RETURNING *;
+
+-- name: GetNextFeedToFetch :one
+SELECT f.*
+FROM feeds f
+JOIN feed_follows ff ON f.id = ff.feed_id
+WHERE ff.user_id = $1
+ORDER BY f.last_fetched ASC NULLS FIRST
+LIMIT 1;
