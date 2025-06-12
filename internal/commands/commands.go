@@ -47,6 +47,16 @@ type RSSItem struct {
 	PubDate     string `xml:"pubDate"`
 }
 
+func MiddlewareLoggedIn(handler func(s *State, cmd Command, user database.User) error) func(*State, Command) error {
+	return func(s *State, cmd Command) error {
+		user, err := s.DB.GetUser(context.Background(), s.Config.CurrentUserName)
+		if err != nil {
+			return err
+		}
+		return handler(s, cmd, user)
+	}
+}
+
 func HandlerLogin(s *State, cmd Command) error {
 	if cmd.Args == nil {
 		return fmt.Errorf("Expected a username")
@@ -183,17 +193,13 @@ func HandlerAgg(s *State, cmd Command) error {
 	return nil
 }
 
-func HandlerAddFeed(s *State, cmd Command) error {
+func HandlerAddFeed(s *State, cmd Command, user database.User) error {
 	if len(cmd.Args) != 2 {
 		fmt.Println("Usage: addfeed <feed_name> <feed_url>")
 		os.Exit(1)
 	}
 	feedName := cmd.Args[0]
 	feedURL := cmd.Args[1]
-	user, err := s.DB.GetUser(context.Background(), s.Config.CurrentUserName)
-	if err != nil {
-		return err
-	}
 	feedParams := database.AddFeedParams{
 		ID:        uuid.New(),
 		CreatedAt: time.Now(),
@@ -206,6 +212,14 @@ func HandlerAddFeed(s *State, cmd Command) error {
 	if err != nil {
 		return err
 	}
+	feedFollowParams := database.CreateFeedFollowParams{
+		UserID: user.ID,
+		FeedID: feed.ID,
+	}
+	_, err = s.DB.CreateFeedFollow(context.Background(), feedFollowParams)
+	if err != nil {
+		return err
+	}
 	fmt.Printf("Feed added successfully\n")
 	fmt.Printf("Feed ID: %s\n", feed.ID)
 	fmt.Printf("Feed CreatedAt: %s\n", feed.CreatedAt)
@@ -214,6 +228,7 @@ func HandlerAddFeed(s *State, cmd Command) error {
 	fmt.Printf("Feed URL: %s\n", feed.Url)
 	fmt.Printf("Feed User: %s\n", s.Config.CurrentUserName)
 	fmt.Printf("Feed UserID: %s\n", feed.UserID)
+	fmt.Printf("Feed: %s now followed by %s\n", feed.Name, s.Config.CurrentUserName)
 	return nil
 }
 
@@ -237,5 +252,56 @@ func HandlerGetFeeds(s *State, cmd Command) error {
 		fmt.Printf("Feed User: %s\n", userName.Name)
 		fmt.Printf("Feed UserID: %s\n", feed.UserID)
 	}
+	return nil
+}
+
+func HandlerFollow(s *State, cmd Command, user database.User) error {
+	url := cmd.Args[0]
+	feed, err := s.DB.GetFeedByURL(context.Background(), url)
+	if err != nil {
+		return err
+	}
+	feedFollowParams := database.CreateFeedFollowParams{
+		UserID: user.ID,
+		FeedID: feed.ID,
+	}
+	feedFollow, err := s.DB.CreateFeedFollow(context.Background(), feedFollowParams)
+	fmt.Printf("Feed Name: %s\n", feedFollow.FeedName)
+	fmt.Printf("Feed User: %s\n", feedFollow.UserName)
+	return nil
+}
+
+func HandlerFollowing(s *State, cmd Command, user database.User) error {
+	follows, err := s.DB.GetFeedFollowsForUser(context.Background(), user.ID)
+	if err != nil {
+		return err
+	}
+	if len(follows) == 0 {
+		fmt.Println("No feeds followed")
+		return nil
+	}
+	fmt.Println("Feeds followed:")
+	for _, follow := range follows {
+		fmt.Printf("Feed Name: %s\n", follow.FeedName)
+		fmt.Printf("Feed User: %s\n", follow.UserName)
+	}
+	return nil
+}
+
+func HandlerUnfollow(s *State, cmd Command, user database.User) error {
+	url := cmd.Args[0]
+	feed, err := s.DB.GetFeedByURL(context.Background(), url)
+	if err != nil {
+		return err
+	}
+	feedFollowParams := database.UnfollowFeedParams{
+		UserID: user.ID,
+		FeedID: feed.ID,
+	}
+	_, err = s.DB.UnfollowFeed(context.Background(), feedFollowParams)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Feed: %s now unfollowed by %s\n", feed.Name, user.Name)
 	return nil
 }

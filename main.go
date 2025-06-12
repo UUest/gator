@@ -39,8 +39,11 @@ func main() {
 	c.Register("reset", commands.HandlerReset)
 	c.Register("users", commands.HandlerGetUsers)
 	c.Register("agg", commands.HandlerAgg)
-	c.Register("addfeed", commands.HandlerAddFeed)
+	c.Register("addfeed", commands.MiddlewareLoggedIn(commands.HandlerAddFeed))
 	c.Register("feeds", commands.HandlerGetFeeds)
+	c.Register("follow", commands.MiddlewareLoggedIn(commands.HandlerFollow))
+	c.Register("following", commands.MiddlewareLoggedIn(commands.HandlerFollowing))
+	c.Register("unfollow", commands.MiddlewareLoggedIn(commands.HandlerUnfollow))
 
 	input := os.Args
 	switch input[1] {
@@ -77,6 +80,21 @@ func main() {
 	case "feeds":
 		if len(input) < 2 {
 			fmt.Println("Usage: gator feeds")
+			os.Exit(1)
+		}
+	case "follow":
+		if len(input) < 3 {
+			fmt.Println("Usage: gator follow <feed_url>")
+			os.Exit(1)
+		}
+	case "following":
+		if len(input) < 2 {
+			fmt.Println("Usage: gator following")
+			os.Exit(1)
+		}
+	case "unfollow":
+		if len(input) < 3 {
+			fmt.Println("Usage: gator unfollow <feed_url>")
 			os.Exit(1)
 		}
 	default:
